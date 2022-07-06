@@ -6,11 +6,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
+import java.util.concurrent.TimeUnit;
+
 
 public class DistributedLockAspect {
 
-    // 30 seconds
-    private static final long LOCK_TIMEOUT = 30000;
+    // TODO: Configure-able via annotation
+    private static final long LOCK_TIMEOUT = 30;
+    // TODO: Configure-able via annotation
+    private static final TimeUnit TIMEOUT_UNIT = TimeUnit.SECONDS;
 
     @Autowired
     private RedisTemplate<String, Boolean> redisTemplate;
@@ -25,14 +29,14 @@ public class DistributedLockAspect {
             throw new RuntimeException("Lock already acquired");
         }
 
-        // TODO: Figure out timeout
+        redisTemplate.boundValueOps(cacheKey).set(true, LOCK_TIMEOUT, TIMEOUT_UNIT);
         return true;
     }
 
     protected boolean releaseLock(String cacheKey) {
         System.out.println("Releasing lock for '" + cacheKey);
         Boolean currentLockValue = this.redisTemplate.boundValueOps(cacheKey).getAndDelete();
-        return true;
+        return currentLockValue;
     }
 
 //    @Around(value = "@annotation(distributedLock)", argNames = "proceedingJoinPoint,distributedLock")
