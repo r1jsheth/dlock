@@ -41,14 +41,15 @@ public class DistributedLockAspect {
         return currentLockValue;
     }
 
-//    @Around(value = "@annotation(distributedLock)", argNames = "proceedingJoinPoint,distributedLock")
-    public Object doUnderLock(ProceedingJoinPoint proceedingJoinPoint) throws Throwable {
-        String cacheKey = getLockKey(proceedingJoinPoint);
+//    @Around(value = "@annotation(distributedLock)", argNames = "pjp")
+    public Object doUnderLock(ProceedingJoinPoint pjp) throws Throwable {
+        String cacheKey = getLockKey(pjp);
+        System.out.println("proceeding join point signature, location, target:: " + pjp.getSignature() + pjp.getSourceLocation() + pjp.getTarget());
 
         acquireLock(cacheKey);
 
         try {
-            return proceedingJoinPoint.proceed();
+            return pjp.proceed();
         } catch (Throwable throwable) {
             System.out.println("Proceeding failed: " + throwable);
             throw throwable;
