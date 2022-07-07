@@ -20,7 +20,7 @@ public class DistributedLockAspect {
 
     @Autowired
     private RedisTemplate<String, Boolean> redisTemplate;
-git
+
     protected boolean acquireLock(String cacheKey, int lockTimeout, TimeUnit timeUnit) throws DistributedLockException {
         System.out.println("Acquiring lock for key: " + cacheKey);
 
