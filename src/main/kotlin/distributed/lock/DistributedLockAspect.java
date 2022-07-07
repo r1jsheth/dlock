@@ -16,6 +16,8 @@ public class DistributedLockAspect {
     // TODO: Configure-able via annotation
     private static final TimeUnit TIMEOUT_UNIT = TimeUnit.SECONDS;
 
+    private static final String CUSTOM_LOCK_KEY = "CUSTOM_KEY";
+
     @Autowired
     private RedisTemplate<String, Boolean> redisTemplate;
 
@@ -40,8 +42,8 @@ public class DistributedLockAspect {
     }
 
 //    @Around(value = "@annotation(distributedLock)", argNames = "proceedingJoinPoint,distributedLock")
-    public Object doUnderLock(ProceedingJoinPoint proceedingJoinPoint, String key) throws Throwable {
-        String cacheKey = evalCacheKeyOriginal(proceedingJoinPoint, key);
+    public Object doUnderLock(ProceedingJoinPoint proceedingJoinPoint) throws Throwable {
+        String cacheKey = getLockKey(proceedingJoinPoint);
 
         acquireLock(cacheKey);
 
@@ -55,12 +57,9 @@ public class DistributedLockAspect {
         }
     }
 
-    private String evalCacheKeyOriginal(ProceedingJoinPoint proceedingJoinPoint, String key) {
-        SpelExpressionParser parser = new SpelExpressionParser();
-        StandardEvaluationContext context = new StandardEvaluationContext();
-        context.setVariable("args", proceedingJoinPoint.getArgs());
+    private String getLockKey(ProceedingJoinPoint proceedingJoinPoint) {
+        return proceedingJoinPoint.getArgs().length > 0 ? proceedingJoinPoint.getArgs()[0].toString() : CUSTOM_LOCK_KEY;
 
-        return parser.parseExpression(key).getValue(context).toString();
     }
 
 }
