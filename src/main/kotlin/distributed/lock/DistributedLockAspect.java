@@ -8,6 +8,7 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
+import redis.clients.jedis.Jedis;
 
 import java.util.concurrent.TimeUnit;
 
@@ -19,33 +20,33 @@ public class DistributedLockAspect {
     public void distributedLock() {}
 
     @Autowired
-    private RedisTemplate<String, Boolean> redisTemplate;
+    private Jedis jedis;
 
     protected boolean acquireLock(String cacheKey, int lockTimeout, TimeUnit timeUnit) throws DistributedLockException {
         System.out.println("Acquiring lock for key: " + cacheKey);
 
-        Boolean currentLockValue = redisTemplate.boundValueOps(cacheKey).get();
+        String currentLockValue = jedis.get(cacheKey);
+
         System.out.println("Current value for lock '" + cacheKey + "': " + currentLockValue);
 
-        if (currentLockValue != null && currentLockValue == true) {
+        if (currentLockValue != null && currentLockValue == "true") {
             String message = "Lock already acquired for (" + cacheKey + "). Locked by another request";
             throw new DistributedLockException(message);
         }
 
-        redisTemplate.boundValueOps(cacheKey).set(true, lockTimeout, timeUnit);
+//        redisTemplate.boundValueOps(cacheKey).set(true, lockTimeout, timeUnit);
+        jedis.set(cacheKey, "true");
         return true;
     }
 
     protected boolean releaseLock(String cacheKey) {
         System.out.println("Releasing lock for '" + cacheKey);
-//        Boolean currentLockValue = this.redisTemplate.boundValueOps(cacheKey).getAndDelete();
-        Boolean currentLockValue = redisTemplate.delete("abc");
-        return currentLockValue;
+        jedis.del(cacheKey);
+        return true;
     }
 
     @Around("distributedLock()")
     public Object doUnderLock(ProceedingJoinPoint pjp) {
-
         String cacheKey = getLockKey(pjp);
         int timeOut = getTimeOut(pjp);
         TimeUnit timeOutUnit = getTimeUnit(pjp);
