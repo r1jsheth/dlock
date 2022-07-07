@@ -23,18 +23,19 @@ public class DistributedLockAspect {
     private Jedis jedis;
 
     protected boolean acquireLock(String cacheKey, int lockTimeout, TimeUnit timeUnit) throws DistributedLockException {
-        System.out.println("Acquiring lock for key: " + cacheKey);
+        System.out.println("Acquiring lock for key: `" + cacheKey + "`");
 
         String currentLockValue = jedis.get(cacheKey);
 
         System.out.println("Current value for lock '" + cacheKey + "': " + currentLockValue);
 
+        // TODO: remove true as string, problem jedis.set() expects only string as a second param
         if (currentLockValue != null && currentLockValue == "true") {
             String message = "Lock already acquired for (" + cacheKey + "). Locked by another request";
             throw new DistributedLockException(message);
         }
 
-//        redisTemplate.boundValueOps(cacheKey).set(true, lockTimeout, timeUnit);
+        // TODO: Figure out lock timeout and timeunit
         jedis.set(cacheKey, "true");
         return true;
     }
@@ -60,6 +61,7 @@ public class DistributedLockAspect {
         } catch (DistributedLockException e) {
             e.printStackTrace();
         } catch (Throwable throwable) {
+            // Something unexpected happened in the method (pjp)
             throwable.printStackTrace();
         } finally {
             if (isLockAcquired) {
