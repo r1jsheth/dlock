@@ -20,7 +20,8 @@ public class RedisRepository {
 
     @Bean
     public RedisTemplate<String, Boolean> getRedisTemplate() {
-        RedisTemplate<String, Boolean> template = new RedisTemplate<>();
+        System.out.println("initiating new redis template::: `getRedisTemplate`");
+        RedisTemplate<String, Boolean> template = new RedisTemplate<String, Boolean>();
         template.setConnectionFactory(jedisConnectionFactory());
         return template;
     }
