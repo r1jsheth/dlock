@@ -41,7 +41,7 @@ public class DistributedLockAspect {
         return currentLockValue;
     }
 
-//    @Around(value = "@annotation(distributedLock)", argNames = "pjp")
+    @Around("publicMethod() && @within(executeWithLock)")
     public Object doUnderLock(ProceedingJoinPoint pjp) throws Throwable {
         String cacheKey = getLockKey(pjp);
         System.out.println("proceeding join point signature, location, target:: " + pjp.getSignature() + pjp.getSourceLocation() + pjp.getTarget());
