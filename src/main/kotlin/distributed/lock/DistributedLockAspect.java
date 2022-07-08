@@ -23,11 +23,10 @@ public class DistributedLockAspect {
 
     protected void acquireLock(String cacheKey, int lockTimeout) throws DistributedLockException {
         String currentLockValue = jedis.get(cacheKey);
-
         System.out.println("Current value for lock '" + cacheKey + "': " + currentLockValue);
 
         // TODO: remove true as string, problem jedis.set() expects only string as a second param
-        if (currentLockValue != null && currentLockValue == "true") {
+        if (currentLockValue != null && currentLockValue.equals("true")) {
             String message = "Lock already acquired for (" + cacheKey + "). Locked by another request";
             throw new DistributedLockException(message);
         }
@@ -40,17 +39,14 @@ public class DistributedLockAspect {
     protected void releaseLock(String cacheKey) {
         System.out.println("Releasing lock for `" + cacheKey + "`");
         jedis.del(cacheKey);
-        return true;
     }
 
     @Around("distributedLock()")
     public Object doUnderLock(ProceedingJoinPoint pjp) throws Throwable {
         String cacheKey = getLockKey(pjp);
         int timeOut = getTimeOut(pjp);
-        TimeUnit timeOutUnit = getTimeUnit(pjp);
 
         Object returnVal = null;
-        boolean isLockAcquired = false;
 
         try {
             acquireLock(cacheKey, timeOut);
