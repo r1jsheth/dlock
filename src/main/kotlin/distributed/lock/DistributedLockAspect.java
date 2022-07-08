@@ -6,11 +6,10 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.params.SetParams;
 
-import java.util.concurrent.TimeUnit;
 
 @Aspect
 @Component
@@ -22,9 +21,7 @@ public class DistributedLockAspect {
     @Autowired
     private Jedis jedis;
 
-    protected boolean acquireLock(String cacheKey, int lockTimeout, TimeUnit timeUnit) throws DistributedLockException {
-        System.out.println("Acquiring lock for key: `" + cacheKey + "`");
-
+    protected void acquireLock(String cacheKey, int lockTimeout) throws DistributedLockException {
         String currentLockValue = jedis.get(cacheKey);
 
         System.out.println("Current value for lock '" + cacheKey + "': " + currentLockValue);
@@ -35,19 +32,19 @@ public class DistributedLockAspect {
             throw new DistributedLockException(message);
         }
 
-        // TODO: Figure out lock timeout and timeunit
-        jedis.set(cacheKey, "true");
-        return true;
+        SetParams params = new SetParams().ex((long) lockTimeout);
+        System.out.println("Acquiring lock for key: `" + cacheKey + "`" + "with timeout `" + lockTimeout + "`");
+        jedis.set(cacheKey, "true", params);
     }
 
-    protected boolean releaseLock(String cacheKey) {
-        System.out.println("Releasing lock for '" + cacheKey);
+    protected void releaseLock(String cacheKey) {
+        System.out.println("Releasing lock for `" + cacheKey + "`");
         jedis.del(cacheKey);
         return true;
     }
 
     @Around("distributedLock()")
-    public Object doUnderLock(ProceedingJoinPoint pjp) {
+    public Object doUnderLock(ProceedingJoinPoint pjp) throws Throwable {
         String cacheKey = getLockKey(pjp);
         int timeOut = getTimeOut(pjp);
         TimeUnit timeOutUnit = getTimeUnit(pjp);
@@ -56,17 +53,17 @@ public class DistributedLockAspect {
         boolean isLockAcquired = false;
 
         try {
-            isLockAcquired = acquireLock(cacheKey, timeOut, timeOutUnit);
+            acquireLock(cacheKey, timeOut);
             returnVal = pjp.proceed();
         } catch (DistributedLockException e) {
             e.printStackTrace();
+            throw e;
         } catch (Throwable throwable) {
             // Something unexpected happened in the method (pjp)
             throwable.printStackTrace();
+            throw throwable;
         } finally {
-            if (isLockAcquired) {
-                releaseLock(cacheKey);
-            }
+            releaseLock(cacheKey);
         }
         return returnVal;
     }
@@ -79,11 +76,6 @@ public class DistributedLockAspect {
     private int getTimeOut(ProceedingJoinPoint pjp) {
         MethodSignature signature = (MethodSignature) pjp.getSignature();
         return signature.getMethod().getAnnotation(DistributedLock.class).timeout();
-    }
-
-    private TimeUnit getTimeUnit(ProceedingJoinPoint pjp) {
-        MethodSignature signature = (MethodSignature) pjp.getSignature();
-        return signature.getMethod().getAnnotation(DistributedLock.class).timeoutUnit();
     }
 
 }

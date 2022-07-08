@@ -23,35 +23,11 @@ const val REDIS_PORT = 6379;
 @RestController
 class MainController {
 
-	@DistributedLock(key = "users", timeout = 10, timeoutUnit = TimeUnit.SECONDS)
+	@DistributedLock(key = "users")
 	@GetMapping("/users")
 	fun diThis(): String {
 		println("just starting the fun - 1")
 		println("starting the fun - 2")
-		try {
-
-//			val config = Config()
-//			config.useClusterServers()
-//				.addNodeAddress("redis://127.0.0.1:$REDIS_PORT")
-//
-//			val redissonClient = Redisson.create()
-//			var buckets = redissonClient.buckets;
-//			println("bucektsss:::$buckets")
-//
-//			var keys = redissonClient.getKeys();
-//
-//			var allKeys = keys.getKeys();
-//
-//			for (key in allKeys) {
-//				println("key::::$key")
-//			}
-//			val redisTemplate: RedisTemplate<String, Boolean> = getRedisTemplate()
-			println("just checkkk")
-
-		} catch (e: Exception) {
-			println("WOW, something bad::: $e")
-		}
-
 
 		return "Hello, World!";
 	}
