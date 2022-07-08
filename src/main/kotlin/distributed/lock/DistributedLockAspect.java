@@ -15,6 +15,9 @@ import redis.clients.jedis.params.SetParams;
 @Component
 public class DistributedLockAspect {
 
+    // jedis.set() expects only string as a second param
+    static final String LOCK_VALUE = "true";
+
     @Pointcut("@annotation(distributed.lock.DistributedLock)")
     public void distributedLock() {}
 
@@ -25,15 +28,14 @@ public class DistributedLockAspect {
         String currentLockValue = jedis.get(cacheKey);
         System.out.println("Current value for lock '" + cacheKey + "': " + currentLockValue);
 
-        // TODO: remove true as string, problem jedis.set() expects only string as a second param
-        if (currentLockValue != null && currentLockValue.equals("true")) {
+        if (currentLockValue != null && currentLockValue.equals(LOCK_VALUE)) {
             String message = "Lock already acquired for (" + cacheKey + "). Locked by another request";
             throw new DistributedLockException(message);
         }
 
         SetParams params = new SetParams().ex((long) lockTimeout);
         System.out.println("Acquiring lock for key: `" + cacheKey + "`" + "with timeout `" + lockTimeout + "`");
-        jedis.set(cacheKey, "true", params);
+        jedis.set(cacheKey, LOCK_VALUE, params);
     }
 
     protected void releaseLock(String cacheKey) {
@@ -46,7 +48,7 @@ public class DistributedLockAspect {
         String cacheKey = getLockKey(pjp);
         int timeOut = getTimeOut(pjp);
 
-        Object returnVal = null;
+        Object returnVal;
 
         try {
             acquireLock(cacheKey, timeOut);
