@@ -5,42 +5,39 @@ import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.integration.support.locks.LockRegistry;
 import org.springframework.stereotype.Component;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.params.SetParams;
+
+import java.util.concurrent.locks.Lock;
 
 
 @Aspect
 @Component
 public class DistributedLockAspect {
 
-    // jedis.set() expects only string as a second param
-    static final String LOCK_VALUE = "true";
-
     @Pointcut("@annotation(distributed.lock.DistributedLock)")
     public void distributedLock() {}
 
-    @Autowired
-    private Jedis jedis;
+
+    private LockRegistry lockRegistry;
+
+    public DistributedLockAspect () {
+        this.lockRegistry = new RedisLockRepository().getLockRegistry();
+    }
 
     protected void acquireLock(String cacheKey, int lockTimeout) throws DistributedLockException {
-        String currentLockValue = jedis.get(cacheKey);
-        System.out.println("Current value for lock '" + cacheKey + "': " + currentLockValue);
-
-        if (currentLockValue != null && currentLockValue.equals(LOCK_VALUE)) {
-            String message = "Lock already acquired for (" + cacheKey + "). Locked by another request";
-            throw new DistributedLockException(message);
+        Lock lock = lockRegistry.obtain(cacheKey);
+        boolean isLockAvailable = lock.tryLock();
+        System.out.println("Current lock-value for key `" + cacheKey + "`:" + isLockAvailable);
+        if (isLockAvailable) {
+            System.out.println("Lock is available, now locking...");
+            lock.lock();
         }
-
-        SetParams params = new SetParams().ex((long) lockTimeout);
-        System.out.println("Acquiring lock for key: `" + cacheKey + "`" + "with timeout `" + lockTimeout + "`");
-        jedis.set(cacheKey, LOCK_VALUE, params);
     }
 
     protected void releaseLock(String cacheKey) {
         System.out.println("Releasing lock for `" + cacheKey + "`");
-        jedis.del(cacheKey);
+        lockRegistry.obtain(cacheKey).unlock();
     }
 
     @Around("distributedLock()")
