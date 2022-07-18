@@ -15,6 +15,9 @@ public @interface DistributedLock {
 
     String key() default DEFAULT_KEY;
 
+    /**
+     * Assumption: TimeUnit is `TimeUnit.SECONDS`
+     */
     int timeout() default DEFAULT_TIMEOUT;
 
 }
