@@ -1,5 +1,6 @@
 package distributed.lock;
 
+import jodd.introspector.Methods;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -7,6 +8,8 @@ import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.integration.support.locks.LockRegistry;
 import org.springframework.stereotype.Component;
+
+import java.lang.reflect.Method;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 
@@ -44,6 +47,10 @@ public class DistributedLockAspect {
     public Object doUnderLock(ProceedingJoinPoint pjp) throws Throwable {
         String cacheKey = getLockKey(pjp);
         int timeOut = getTimeOut(pjp);
+
+        MethodSignature signature = (MethodSignature) pjp.getSignature();
+        Method any = signature.getMethod().getAnnotation(DistributedLock.class).clazz().getMethod("getKey");
+        System.out.println("----- here -----" + any.invoke(signature.getMethod().getAnnotation(DistributedLock.class).clazz().newInstance()));
 
         Object returnVal;
 

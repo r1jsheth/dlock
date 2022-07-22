@@ -6,7 +6,6 @@ import org.springframework.boot.runApplication
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
 
-
 @SpringBootApplication(exclude = [DataSourceAutoConfiguration::class])
 class LockApplication
 
@@ -14,14 +13,17 @@ fun main(args: Array<String>) {
 	runApplication<LockApplication>(*args)
 }
 
-const val REDIS_PORT = 6379;
-
 @RestController
 class MainController {
 
-	@DistributedLock(key = "users")
+	public fun getKey(): String {
+		return "wow this is working";
+	}
+
+	@DistributedLock(key = "users", clazz = MainController::class)
 	@GetMapping("/users")
-	fun diThis(): String {
+	fun doThis(): String {
+		val keyValue: String = "abc";
 		println("just starting the fun - 1")
 		println("starting the fun - 2")
 
