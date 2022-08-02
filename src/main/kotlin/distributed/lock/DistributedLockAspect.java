@@ -1,66 +1,83 @@
 package distributed.lock;
 
+import jodd.introspector.Methods;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Pointcut;
+import org.aspectj.lang.reflect.MethodSignature;
+import org.springframework.integration.support.locks.LockRegistry;
+import org.springframework.stereotype.Component;
+
+import java.lang.reflect.Method;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
 
 
+@Aspect
+@Component
 public class DistributedLockAspect {
 
-    // TODO: Configure-able via annotation
-    private static final long LOCK_TIMEOUT = 30;
-    // TODO: Configure-able via annotation
-    private static final TimeUnit TIMEOUT_UNIT = TimeUnit.SECONDS;
+    @Pointcut("@annotation(distributed.lock.DistributedLock)")
+    public void distributedLock() {}
 
-    private static final String CUSTOM_LOCK_KEY = "CUSTOM_KEY";
 
-    @Autowired
-    private RedisTemplate<String, Boolean> redisTemplate;
+    private final LockRegistry lockRegistry;
 
-    protected boolean acquireLock(String cacheKey) {
-        System.out.println("Acquiring lock for key: " + cacheKey);
+    public DistributedLockAspect () {
+        this.lockRegistry = new RedisLockRepository().getLockRegistry();
+    }
 
-        Boolean currentLockValue = this.redisTemplate.boundValueOps(cacheKey).get();
-        System.out.println("Current value for lock '" + cacheKey + "': " + currentLockValue);
-
-        if (currentLockValue) {
-            throw new RuntimeException("Lock already acquired");
+    protected void acquireLock(String cacheKey, int lockTimeout) throws DistributedLockException, InterruptedException {
+        Lock lock = lockRegistry.obtain(cacheKey);
+        boolean isLockAcquired = lock.tryLock(lockTimeout, TimeUnit.SECONDS);
+        System.out.println("Lock acquired for key: `" + cacheKey + "`:" + isLockAcquired);
+        if (!isLockAcquired) {
+            throw new DistributedLockException("Lock is not available for key:" + cacheKey);
         }
-
-        redisTemplate.boundValueOps(cacheKey).set(true, LOCK_TIMEOUT, TIMEOUT_UNIT);
-        return true;
     }
 
-    protected boolean releaseLock(String cacheKey) {
-        System.out.println("Releasing lock for '" + cacheKey);
-        Boolean currentLockValue = this.redisTemplate.boundValueOps(cacheKey).getAndDelete();
-        return currentLockValue;
+    protected void releaseLock(String cacheKey) {
+        System.out.println("Releasing lock for `" + cacheKey + "`");
+        Lock lock = lockRegistry.obtain(cacheKey);
+        lock.unlock();
     }
 
-    @Around("publicMethod() && @within(executeWithLock)")
+    @Around("distributedLock()")
     public Object doUnderLock(ProceedingJoinPoint pjp) throws Throwable {
         String cacheKey = getLockKey(pjp);
-        System.out.println("proceeding join point signature, location, target:: " + pjp.getSignature() + pjp.getSourceLocation() + pjp.getTarget());
+        int timeOut = getTimeOut(pjp);
 
-        acquireLock(cacheKey);
+        MethodSignature signature = (MethodSignature) pjp.getSignature();
+        Method any = signature.getMethod().getAnnotation(DistributedLock.class).clazz().getMethod("getKey");
+        System.out.println("----- here -----" + any.invoke(signature.getMethod().getAnnotation(DistributedLock.class).clazz().newInstance()));
+
+        Object returnVal;
 
         try {
-            return pjp.proceed();
+            acquireLock(cacheKey, timeOut);
+            returnVal = pjp.proceed();
+        } catch (DistributedLockException e) {
+            e.printStackTrace();
+            throw e;
         } catch (Throwable throwable) {
-            System.out.println("Proceeding failed: " + throwable);
+            // Something unexpected happened in the method (pjp)
+            throwable.printStackTrace();
             throw throwable;
         } finally {
             releaseLock(cacheKey);
         }
+        return returnVal;
     }
 
-    private String getLockKey(ProceedingJoinPoint proceedingJoinPoint) {
-        return proceedingJoinPoint.getArgs().length > 0 ? proceedingJoinPoint.getArgs()[0].toString() : CUSTOM_LOCK_KEY;
+    private String getLockKey(ProceedingJoinPoint pjp) {
+        MethodSignature signature = (MethodSignature) pjp.getSignature();
+        return signature.getMethod().getAnnotation(DistributedLock.class).key();
+    }
 
+    private int getTimeOut(ProceedingJoinPoint pjp) {
+        MethodSignature signature = (MethodSignature) pjp.getSignature();
+        return signature.getMethod().getAnnotation(DistributedLock.class).timeout();
     }
 
 }
