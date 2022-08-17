@@ -20,6 +20,6 @@ public @interface DistributedLock {
      */
     int timeout() default DEFAULT_TIMEOUT;
 
-    Class<?> clazz();
+//    Class<?> clazz();
 
 }

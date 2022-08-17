@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController
 @RestController()
 class MainController {
 
-    @DistributedLock(clazz = MainController::class)
+    @DistributedLock(key = "alphaOne")
     @GetMapping("/test/{v1}/{v2}/{v3}")
     fun test(@PathVariable v1: String, @PathVariable v2: String, @PathVariable @KeyVariable v3 : String) : String {
         return "Check"
