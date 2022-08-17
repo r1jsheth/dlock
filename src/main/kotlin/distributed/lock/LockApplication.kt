@@ -20,25 +20,6 @@ fun main(args: Array<String>) {
 class MainController {
 
 
-	public fun getKey(): String {
-		return "wow this is working";
-	}
-
-	@DistributedLock(key = "users", clazz = MainController::class)
-	@GetMapping("/users")
-	fun doThis(): String {
-		val keyValue: String = "abc";
-		println("just starting the fun - 1")
-		println("starting the fun - 2")
-
-		return "Hello, World!";
-	}
-
-	@GetMapping("asd")
-	fun asas() {
-
-	}
-
 	@DistributedLock(clazz = MainController::class)
 	@GetMapping("/test/{v1}/{v2}/{v3}")
 	fun test(@PathVariable v1: String, @PathVariable v2: String, @PathVariable @KeyVariable v3 : String) : String {
