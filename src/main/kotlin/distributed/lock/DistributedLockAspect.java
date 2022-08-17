@@ -1,6 +1,6 @@
 package distributed.lock;
 
-import jodd.introspector.Methods;
+import org.apache.commons.lang3.StringUtils;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -48,6 +48,22 @@ public class DistributedLockAspect {
         String cacheKey = getLockKey(pjp);
         int timeOut = getTimeOut(pjp);
 
+        Object[] args = pjp.getArgs();
+        Class<?> className = pjp.getTarget().getClass();
+        String methodName = pjp.getSignature().getName();
+        Class<?>[] argClass = ((MethodSignature) pjp.getSignature()).getParameterTypes();
+        Method method = className.getMethod(methodName, argClass);
+        DistributedLock annotation = method.getAnnotation(DistributedLock.class);
+        String key = "" ;
+
+
+        // is there a annotation : method.getParameterAnnotations()[i].length > 0
+        // is any of the annotation of type :  method.getParameterAnnotations()[2][j].annotationType().name.split("\\.",0)[last element] == KeyVariable
+        // pjp.getArgs[i]
+
+        //method.getParameterAnnotations()[2][1] instanceof KeyVariable
+
+
         MethodSignature signature = (MethodSignature) pjp.getSignature();
         Method any = signature.getMethod().getAnnotation(DistributedLock.class).clazz().getMethod("getKey");
         System.out.println("----- here -----" + any.invoke(signature.getMethod().getAnnotation(DistributedLock.class).clazz().newInstance()));
@@ -79,5 +95,6 @@ public class DistributedLockAspect {
         MethodSignature signature = (MethodSignature) pjp.getSignature();
         return signature.getMethod().getAnnotation(DistributedLock.class).timeout();
     }
+
 
 }
