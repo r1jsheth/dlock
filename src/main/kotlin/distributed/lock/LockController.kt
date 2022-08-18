@@ -12,6 +12,7 @@ class MainController {
     @DistributedLock()
     @GetMapping("/test/{v1}/{v2}/{v3}")
     fun test(@PathVariable v1: String, @PathVariable v2: String, @PathVariable @KeyVariable v3 : String) : String {
+        println("Function Runs!!!")
         return "Check"
     }
 }

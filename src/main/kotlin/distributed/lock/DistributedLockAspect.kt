@@ -9,6 +9,7 @@ import org.aspectj.lang.reflect.MethodSignature
 import org.springframework.integration.support.locks.LockRegistry
 import org.springframework.stereotype.Component
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.Lock
 
 @Aspect
 @Component
@@ -18,20 +19,28 @@ class DistributedLockAspect (private val redisLockRepository: RedisLockRepositor
 
     @Pointcut("@annotation(distributed.lock.DistributedLock)")
     fun distributedLock() {
+
     }
 
     protected fun acquireLock(cacheKey: String, lockTimeout: Int) {
-        val lock = lockRegistry.obtain(cacheKey)
+
+        val lock : Lock = lockRegistry.obtain(cacheKey)
+
         val isLockAcquired = lock.tryLock(lockTimeout.toLong(), TimeUnit.SECONDS)
+
         println("Lock acquired for key: `$cacheKey`:$isLockAcquired")
+
         if (!isLockAcquired) {
             throw DistributedLockException("Lock is not available for key:$cacheKey")
         }
     }
 
     protected fun releaseLock(cacheKey: String) {
+
         println("Releasing lock for `$cacheKey`")
+
         val lock = lockRegistry.obtain(cacheKey)
+
         lock.unlock()
     }
 
@@ -42,10 +51,16 @@ class DistributedLockAspect (private val redisLockRepository: RedisLockRepositor
 
         val cacheKey = getKey(pjp)
 
-        return try {
+        try {
+
             acquireLock(cacheKey, timeOut)
-            pjp.proceed()
+
+            val pjpReturn = pjp.proceed()
+
             releaseLock(cacheKey)
+
+            return pjpReturn
+
         } catch (e: DistributedLockException) {
             throw e
         } catch (e : Exception) {
@@ -68,7 +83,7 @@ class DistributedLockAspect (private val redisLockRepository: RedisLockRepositor
 
         val method = className.getMethod(methodName, *argClass)
 
-        var parameterAnnotations: Array<Array<Annotation>> = method.parameterAnnotations
+        val parameterAnnotations: Array<Array<Annotation>> = method.parameterAnnotations
 
         assert(args.size == parameterAnnotations.size)
 
@@ -88,10 +103,10 @@ class DistributedLockAspect (private val redisLockRepository: RedisLockRepositor
         throw Exception("KeyVariable Not Provided")
     }
 
-
-
     private fun getTimeOut(pjp: ProceedingJoinPoint): Int {
+
         val signature = pjp.signature as MethodSignature
+
         return signature.method.getAnnotation(DistributedLock::class.java).timeout
     }
 }
