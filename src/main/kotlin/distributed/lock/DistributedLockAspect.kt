@@ -1,5 +1,6 @@
 package distributed.lock
 
+import distributed.lock.repository.RedisLockRepository
 import org.aspectj.lang.ProceedingJoinPoint
 import org.aspectj.lang.annotation.Around
 import org.aspectj.lang.annotation.Aspect
@@ -23,13 +24,12 @@ class DistributedLockAspect {
         lockRegistry = RedisLockRepository().lockRegistry
     }
 
-    @Throws(DistributedLockException::class, InterruptedException::class)
     protected fun acquireLock(cacheKey: String, lockTimeout: Int) {
         val lock = lockRegistry.obtain(cacheKey)
         val isLockAcquired = lock.tryLock(lockTimeout.toLong(), TimeUnit.SECONDS)
         println("Lock acquired for key: `$cacheKey`:$isLockAcquired")
         if (!isLockAcquired) {
-            throw DistributedLockException("Lock is not available for key:$cacheKey")
+            throw Exception("Lock is not available for key:$cacheKey")
         }
     }
 
@@ -40,14 +40,11 @@ class DistributedLockAspect {
     }
 
     @Around("distributedLock()")
-    @Throws(Throwable::class)
     fun doUnderLock(pjp: ProceedingJoinPoint): Any {
-
-        var cacheKey : String = getLockKey(pjp)
 
         val timeOut = getTimeOut(pjp)
 
-        cacheKey = getKey(pjp)
+        val cacheKey = getKey(pjp)
 
         // is there a annotation : method.getParameterAnnotations()[i].length > 0
         // is any of the annotation of type :  method.getParameterAnnotations()[2][j].annotationType().name.split("\\.",0)[last element] == KeyVariable
@@ -59,13 +56,9 @@ class DistributedLockAspect {
         returnVal = try {
             acquireLock(cacheKey, timeOut)
             pjp.proceed()
-        } catch (e: DistributedLockException) {
+        } catch (e: Exception) {
             e.printStackTrace()
             throw e
-        } catch (throwable: Throwable) {
-            // Something unexpected happened in the method (pjp)
-            throwable.printStackTrace()
-            throw throwable
         } finally {
             //            releaseLock(cacheKey);
         }
@@ -105,10 +98,7 @@ class DistributedLockAspect {
         throw Exception("KeyVariable Not Provided")
     }
 
-    private fun getLockKey(pjp: ProceedingJoinPoint): String {
-        val signature = pjp.signature as MethodSignature
-        return signature.method.getAnnotation(DistributedLock::class.java).key
-    }
+
 
     private fun getTimeOut(pjp: ProceedingJoinPoint): Int {
         val signature = pjp.signature as MethodSignature
