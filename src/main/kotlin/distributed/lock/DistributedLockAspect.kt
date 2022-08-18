@@ -12,16 +12,12 @@ import java.util.concurrent.TimeUnit
 
 @Aspect
 @Component
-class DistributedLockAspect {
+class DistributedLockAspect (private val redisLockRepository: RedisLockRepository) {
+
+    private val lockRegistry: LockRegistry = redisLockRepository.getLockRegistry()
 
     @Pointcut("@annotation(distributed.lock.DistributedLock)")
     fun distributedLock() {
-    }
-
-    private val lockRegistry: LockRegistry
-
-    init {
-        lockRegistry = RedisLockRepository().lockRegistry
     }
 
     protected fun acquireLock(cacheKey: String, lockTimeout: Int) {
@@ -29,7 +25,7 @@ class DistributedLockAspect {
         val isLockAcquired = lock.tryLock(lockTimeout.toLong(), TimeUnit.SECONDS)
         println("Lock acquired for key: `$cacheKey`:$isLockAcquired")
         if (!isLockAcquired) {
-            throw Exception("Lock is not available for key:$cacheKey")
+            throw DistributedLockException("Lock is not available for key:$cacheKey")
         }
     }
 
@@ -46,23 +42,17 @@ class DistributedLockAspect {
 
         val cacheKey = getKey(pjp)
 
-        // is there a annotation : method.getParameterAnnotations()[i].length > 0
-        // is any of the annotation of type :  method.getParameterAnnotations()[2][j].annotationType().name.split("\\.",0)[last element] == KeyVariable
-        // pjp.getArgs[i]
-
-        //method.getParameterAnnotations()[2][1] instanceof KeyVariable
-        val returnVal: Any
-
-        returnVal = try {
+        return try {
             acquireLock(cacheKey, timeOut)
             pjp.proceed()
-        } catch (e: Exception) {
-            e.printStackTrace()
+            releaseLock(cacheKey)
+        } catch (e: DistributedLockException) {
             throw e
-        } finally {
-            //            releaseLock(cacheKey);
+        } catch (e : Exception) {
+            releaseLock(cacheKey)
+            throw e
         }
-        return returnVal
+
     }
 
 
