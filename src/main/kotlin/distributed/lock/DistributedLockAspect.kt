@@ -18,21 +18,32 @@ class DistributedLockAspect (private val redisLockRepository: RedisLockRepositor
     private val lockRegistry: LockRegistry = redisLockRepository.getLockRegistry()
 
     @Pointcut("@annotation(distributed.lock.DistributedLock)")
-    fun distributedLock() {
+    fun distributedLock() {}
 
-    }
-
+    // TODO : Waiting time to acquire lock, InterruptedException
     protected fun acquireLock(cacheKey: String, lockTimeout: Int) {
 
-        val lock : Lock = lockRegistry.obtain(cacheKey)
+        println("Trying to Acquire Lock for $cacheKey")
 
-        val isLockAcquired = lock.tryLock(lockTimeout.toLong(), TimeUnit.SECONDS)
+        try {
 
-        println("Lock acquired for key: `$cacheKey`:$isLockAcquired")
+            val lock : Lock = lockRegistry.obtain(cacheKey)
 
-        if (!isLockAcquired) {
-            throw DistributedLockException("Lock is not available for key:$cacheKey")
+            val isLockAcquired = lock.tryLock(lockTimeout.toLong(), TimeUnit.SECONDS)
+
+            if (!isLockAcquired) {
+                throw Exception("Lock is not available for key:$cacheKey")
+            }
+
+            println("Successfully Acquired Lock")
+
+        } catch (e : java.lang.Exception) {
+
+            println("Failed to Acquire Lock ${e.message}")
+
+            throw DistributedLockException("Failed to Acquire Lock ${e.message}")
         }
+
     }
 
     protected fun releaseLock(cacheKey: String) {
@@ -62,8 +73,11 @@ class DistributedLockAspect (private val redisLockRepository: RedisLockRepositor
             return pjpReturn
 
         } catch (e: DistributedLockException) {
+            // Catching Exception while acquiring lock
             throw e
         } catch (e : Exception) {
+            // Catching any exception post acquiring lock ->>> in pjp.proceed()
+            // Releasing Lock
             releaseLock(cacheKey)
             throw e
         }
