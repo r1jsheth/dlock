@@ -35,10 +35,8 @@ class DistributedLockAspect (
         var lockAcquired = false
 
         try {
-            log.info("Fetching Key and Waiting Time")
             val waitingTime = getWaitingTime(pjp)
             val key = getKey(pjp)
-            log.info("Key $key Waiting Time $waitingTime")
 
             log.info("Trying to Acquire Lock for $key")
             lock = lockRegistry.obtain(key)
@@ -62,7 +60,7 @@ class DistributedLockAspect (
 
         } finally {
             if (lockAcquired) {
-                log.info("Releasing lock for")
+                log.info("Releasing lock")
                 lock?.unlock()
             }
         }

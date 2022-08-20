@@ -13,7 +13,7 @@ class LockComponent (
     fun initFunction() {
         try {
             val returnType = this.lockComponentLocked.testLock("lock-key", "2", "3")
-            log.info("returnType = $returnType")
+//            log.info("returnType = $returnType")
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -29,7 +29,7 @@ class LockComponentLocked {
 
     fun testLock(@KeyVariable v1: String, v2: String, v3: String) {
         log.info("Starting the function")
-        Thread.sleep(5000)
+        Thread.sleep(15000)
         log.info("Exiting the function")
 //        throw TestException()
     }
