@@ -12,13 +12,12 @@ class MainController (
         private val component: LockComponent
 ) {
 
-    private val executorService = Executors.newFixedThreadPool(5)
+    private val executorService = Executors.newFixedThreadPool(3)
     @GetMapping("/test")
     fun test() : String {
-        for (i in 1..5) {
+        for (i in 1..3) {
             executorService.execute { component.initFunction() }
         }
-//        component.testLock("lockKey", "2", "3")
         return "Check"
     }
 }

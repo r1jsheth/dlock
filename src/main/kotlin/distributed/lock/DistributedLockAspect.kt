@@ -28,51 +28,51 @@ class DistributedLockAspect (
     fun publicMethod() {
     }
 
-    protected fun releaseLock(cacheKey: String) {
-
-        log.info("Releasing lock for `$cacheKey`")
-
-        val lock = lockRegistry.obtain(cacheKey)
-
-        lock.unlock()
-    }
-
     @Around("publicMethod() && distributedLock()")
     fun doUnderLock(pjp: ProceedingJoinPoint): Any? {
+
         var lock : Lock? = null
         var lockAcquired = false
+
         try {
-            val timeOut = getTimeOut(pjp)
+            log.info("Fetching Key and Waiting Time")
+            val waitingTime = getWaitingTime(pjp)
+            val key = getKey(pjp)
+            log.info("Key $key Waiting Time $waitingTime")
 
-            val cacheKey = getKey(pjp)
-
-            log.info("Trying to Acquire Lock for $cacheKey")
-
-            lock = lockRegistry.obtain(cacheKey)
-
-            lockAcquired = lock.tryLock(timeOut.toLong(), TimeUnit.SECONDS)
-
+            log.info("Trying to Acquire Lock for $key")
+            lock = lockRegistry.obtain(key)
+            lockAcquired = lock.tryLock(waitingTime, TimeUnit.SECONDS)
             if (!lockAcquired) {
-                throw Exception("Lock is not available for key:$cacheKey")
+                throw Exception("Lock is not available for key:$key")
             }
             log.info("Successfully Acquired Lock")
 
-            try {
-                return pjp.proceed()
-            } catch (e: Exception) {
-                throw DistributedProxyException(e)
-            }
+            return runProceedingJoinPoint(pjp)
+
         } catch (e: DistributedProxyException) {
+
+            log.info("Error: PJP")
             throw e.cause ?: e
-        } catch (e : java.lang.Exception) {
 
-            log.info("Failed to Acquire Lock ${e.message}")
+        } catch (e : Exception) {
 
+            log.info("Error: Failed to Acquire Lock ${e.message}")
             throw DistributedLockException("Failed to Acquire Lock ${e.message}")
+
         } finally {
-            log.info("Releasing lock for")
-            if (lockAcquired)
+            if (lockAcquired) {
+                log.info("Releasing lock for")
                 lock?.unlock()
+            }
+        }
+    }
+
+    private fun runProceedingJoinPoint(pjp: ProceedingJoinPoint) : Any? {
+        try {
+            return pjp.proceed()
+        } catch (e: Exception) {
+            throw DistributedProxyException(e)
         }
     }
 
@@ -94,18 +94,21 @@ class DistributedLockAspect (
         assert(args.size == parameterAnnotations.size)
 
         for(i in args.indices) {
+
             for(annotation in parameterAnnotations[i]) {
-                if (annotation is KeyVariable) {
+
+                if ((annotation is KeyVariable) && (args[i] is String) && (args[i] as String).isNotEmpty()) {
+
                     return args[i] as String
                 }
             }
         }
 
-        throw DistributedLockException("KeyVariable Not Provided")
+        throw Exception("Invalid or Empty KeyVariable")
     }
 
-    private fun getTimeOut(pjp: ProceedingJoinPoint): Int {
+    private fun getWaitingTime(pjp: ProceedingJoinPoint): Long {
 
-        return pjp.target.javaClass.getAnnotation(DistributedLock::class.java).timeout
+        return pjp.target.javaClass.getAnnotation(DistributedLock::class.java).waitingTime
     }
 }
